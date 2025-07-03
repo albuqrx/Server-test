@@ -17,7 +17,7 @@ const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN;
 
 // ✅ Проверка подписи Telegram
 function verifyTelegram(initDataString, botToken) {
-  console.log("❌ Подпись Telegram неверна");
+
   const params = new URLSearchParams(initDataString);
   const hash = params.get('hash');
   params.delete('hash');
