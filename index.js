@@ -79,3 +79,7 @@ app.post('/submit_spin', async (req, res) => {
 app.listen(3000, () => {
   console.log("🚀 Сервер запущен на http://localhost:3000");
 });
+
+app.get('/', (req, res) => {
+  res.send('Сервер работае! Добро пожаловать!')
+});
