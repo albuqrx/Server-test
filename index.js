@@ -60,12 +60,12 @@ app.post('/submit_spin', async (req, res) => {
     return res.status(400).json({ error: "missing user or hash" });
   }
 
-  const isValid = verifyTelegram(init_data, TELEGRAM_BOT_TOKEN);
+  // const isValid = verifyTelegram(init_data, TELEGRAM_BOT_TOKEN);
 
-  if (!isValid) {
-    console.error("❌ Подпись Telegram неверна");
-    return res.status(403).json({ error: "Invalid Telegram signature" });
-  }
+  // if (!isValid) {
+  //   console.error("❌ Подпись Telegram неверна");
+  //   return res.status(403).json({ error: "Invalid Telegram signature" });
+  // }
 
   let user;
   try {
