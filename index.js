@@ -55,7 +55,7 @@ app.post('/submit_spin', async (req, res) => {
 
     if (!data) {
       await spinsRef.set({
-        username,
+        username: username,
         spins: 1,
         last_spin: Date.now()
       });
