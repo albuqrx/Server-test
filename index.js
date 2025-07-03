@@ -27,6 +27,12 @@ function verifyTelegram(initDataString, botToken) {
   const secret = crypto.createHash('sha256').update(botToken).digest();
   const hmac = crypto.createHmac('sha256', secret).update(dataCheckString).digest('hex');
 
+
+  console.log("➡️  Проверка подписи Telegram:");
+  console.log("dataCheckString:", dataCheckString);
+  console.log("hash из initData:", hash);
+  console.log("рассчитанный HMAC:", hmac);
+
   return hmac === hash;
 }
 
