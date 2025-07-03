@@ -30,67 +30,91 @@ function verifyTelegram(initDataString, botToken) {
 
 // 🔁 Обработка крутки колеса
 app.post('/submit_spin', async (req, res) => {
+  console.log("📩 Получен запрос от клиента:", JSON.stringify(req.body, null, 2));
+
   const { init_data, result_index } = req.body;
 
-  if (!init_data || typeof result_index !== 'number') {
-    return res.status(400).json({ error: 'Missing init_data or result_index' });
+  if (!init_data || typeof result_index !== "number") {
+    console.warn("⚠️ Плохой payload (init_data или result_index):", req.body);
+    return res.status(400).json({ error: "invalid payload" });
   }
 
-  // ✅ Верификация Telegram WebApp
-  if (!verifyTelegram(init_data, TELEGRAM_BOT_TOKEN)) {
-    return res.status(403).json({ error: 'Invalid Telegram signature' });
+  // Распарсим init_data
+  const url = new URLSearchParams(init_data);
+  const userJson = url.get("user");
+  const hash = url.get("hash");
+
+  if (!userJson || !hash) {
+    console.error("❌ Не хватает user или hash в init_data");
+    return res.status(400).json({ error: "invalid init_data format" });
   }
 
-  // ✅ Извлекаем пользователя
-  const params = new URLSearchParams(init_data);
-  const user = JSON.parse(params.get('user') || '{}');
-  const user_id = String(user.id || 'unknown');
-  const username = user.username || 'anonymous';
+  // Проверка подписи Telegram
+  const initDataWithoutHash = init_data.split("&hash=")[0];
+  const isValid = verifyTelegram(initDataWithoutHash, hash);
 
-  // 🔄 Работа с Firestore
+  if (!isValid) {
+    console.error("❌ Неверная подпись Telegram! Отклоняем запрос.");
+    return res.status(403).json({ error: "Invalid Telegram signature" });
+  }
+
+  let user = {};
   try {
-    const spinsRef = admin.collection('spins').doc(user_id);
-    const doc = await spinsRef.get();
-    const data = doc.exists ? doc.data() : null;
-
-    if (!data) {
-      await spinsRef.set({
-        username: username,
-        spins: 1,
-        last_spin: Date.now()
-      });
-    } else {
-      await spinsRef.update({
-        spins: admin.FieldValue.increment(1),
-        last_spin: Date.now()
-      });
-    }
-
-    const updatedDoc = await spinsRef.get();
-    const updated = updatedDoc.data();
-
-    // 🏆 Получаем приз по индексу
-    const prizeRef = admin.collection('prizes').doc(String(result_index));
-    const prizeDoc = await prizeRef.get();
-
-    if (!prizeDoc.exists) {
-      return res.status(404).json({ error: 'Prize not found' });
-    }
-
-    const prize = prizeDoc.data().text;
-
-    // ✅ Ответ
-    res.json({
-      ok: true,
-      spins: updated.spins,
-      prize
-    });
-
+    user = JSON.parse(userJson);
   } catch (err) {
-    console.error('🔥 Firestore error:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("❌ Ошибка парсинга user JSON:", err.message);
+    return res.status(400).json({ error: "invalid user json" });
   }
+
+  const user_id = String(user.id);
+  const username = user.username || 'anonymous';
+  console.log(`✅ Подпись Telegram подтверждена. Пользователь: ${username} (ID: ${user_id})`);
+
+  // Работа с Firestore
+  const db = admin;
+  const spinsRef = db.collection("spins").doc(user_id);
+  const doc = await spinsRef.get();
+  const data = doc.exists ? doc.data() : null;
+
+  if (!data) {
+    console.log("🆕 Пользователь новый — создаём документ");
+    await spinsRef.set({
+      username: username,
+      spins: 1,
+      last_spin: Date.now()
+    });
+  } else {
+    console.log("🔁 Пользователь уже есть — увеличиваем счётчик");
+    await spinsRef.update({
+      spins: admin.firestore.FieldValue.increment(1),
+      last_spin: Date.now()
+    });
+  }
+
+  const updatedDoc = await spinsRef.get();
+  const updated = updatedDoc.data();
+  console.log("📊 Обновлённые данные пользователя:", updated);
+
+  // Получаем приз
+  const prizeRef = db.collection("prizes").doc(String(result_index));
+  const prizeDoc = await prizeRef.get();
+
+  if (!prizeDoc.exists) {
+    console.warn("🎁 Приз с индексом", result_index, "не найден");
+    return res.status(404).json({ error: "Prize not found" });
+  }
+
+  const prize = prizeDoc.data().text;
+  console.log("🎉 Приз пользователю:", prize);
+
+  // Ответ клиенту
+  res.json({
+    ok: true,
+    spins: updated.spins,
+    prize
+  });
 });
+
 
 // 🔎 Тест Firestore
 app.get('/test-firestore', async (req, res) => {
