@@ -39,6 +39,34 @@ function verifyTelegram(initDataString, botToken) {
 }
 
 
+async function sendTelegramMessage(user_id, message) {
+  const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+
+  const payload = {
+    chat_id: user_id,
+    text: message,
+    parse_mode: "HTML"
+  };
+
+  try {
+    const res = await fetch(TELEGRAM_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error("❌ Ошибка отправки сообщения в Telegram:", data);
+    } else {
+      console.log("✅ Сообщение отправлено пользователю:", user_id);
+    }
+  } catch (err) {
+    console.error("🔥 Сбой при отправке в Telegram:", err.message);
+  }
+}
+
+
 // 🔁 Обработка крутки колеса
 app.post('/submit_spin', async (req, res) => {
   console.log("📩 Получен запрос /submit_spin");
@@ -119,6 +147,10 @@ app.post('/submit_spin', async (req, res) => {
     spins: updated.spins,
     prize: prize
   });
+
+
+  await sendTelegramMessage(user_id, prize);
+
 });
 
 // 🔍 Проверка подключения к Firestore
