@@ -49,7 +49,7 @@ app.post('/submit_spin', async (req, res) => {
     });
   } else {
     await spinsRef.update({
-      spins: admin.firestore.FieldValue.increment(1),
+      spins: admin.FieldValue.increment(1),
       last_spin: Date.now()
     });
   }
