@@ -77,7 +77,7 @@ app.post('/submit_spin', async (req, res) => {
 
 app.get("/test-firestore", async (req, res) => {
   try {
-    const testDoc = await db.collection("spins").limit(1).get();
+    const testDoc = await admin.firestore().collection("spins").limit(1).get();
 
     if (testDoc.empty) {
       return res.json({ ok: true, message: "Firestore подключена, но коллекция пустая." });
