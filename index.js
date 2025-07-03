@@ -36,7 +36,7 @@ app.post('/submit_spin', async (req, res) => {
   const user_id = String(user.id);
   const username = user.username || 'anonymous';
 
-  const db = admin.firestore();
+  const db = admin;
   const spinsRef = db.collection("spins").doc(user_id);
   const doc = await spinsRef.get();
   const data = doc.exists ? doc.data() : null;
