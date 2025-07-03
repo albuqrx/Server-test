@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const admin = require('./firebase');
+const { admin, db, FieldValue } = require('./firebase');
 const cors = require('cors');
 const crypto = require('crypto');
 require('dotenv').config();
@@ -109,7 +109,7 @@ app.post('/submit_spin', async (req, res) => {
   console.log(`✅ Подтверждён пользователь: ${username} (${user_id})`);
 
   // Firestore: запись/обновление
-  const spinsRef = admin.collection("spins").doc(user_id);
+  const spinsRef = db.collection("spins").doc(user_id);
   const doc = await spinsRef.get();
   const existing = doc.exists ? doc.data() : null;
 
@@ -123,7 +123,7 @@ app.post('/submit_spin', async (req, res) => {
   } else {
     console.log("🔁 Увеличиваем счётчик круток");
     await spinsRef.update({
-      spins: admin.firestore.FieldValue.increment(1),
+      spins: FieldValue.increment(1),
       last_spin: Date.now()
     });
   }
