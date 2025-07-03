@@ -75,6 +75,26 @@ app.post('/submit_spin', async (req, res) => {
   });
 });
 
+app.get("/test-firestore", async (req, res) => {
+  try {
+    const testDoc = await db.collection("spins").limit(1).get();
+
+    if (testDoc.empty) {
+      return res.json({ ok: true, message: "Firestore подключена, но коллекция пустая." });
+    }
+
+    const data = [];
+    testDoc.forEach((doc) => {
+      data.push({ id: doc.id, ...doc.data() });
+    });
+
+    res.json({ ok: true, message: "Firestore подключена!", data });
+  } catch (err) {
+    console.error("❌ Ошибка Firestore:", err);
+    res.status(500).json({ ok: false, message: "Ошибка подключения к Firestore", error: err.message });
+  }
+});
+
 // Запуск сервера
 app.listen(3000, () => {
   console.log("🚀 Сервер запущен на http://localhost:3000");
