@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const { admin, db, FieldValue } = require('./firebase');
 const cors = require('cors');
 const crypto = require('crypto');
+const fetch = require('node-fetch');  // добавь, если еще не стоит
 require('dotenv').config();
 
 const app = express();
@@ -11,34 +12,10 @@ app.use(bodyParser.json());
 
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN;
 
-// ✅ Проверка подписи Telegram
-function verifyTelegram(initDataString, botToken) {
-  const params = new URLSearchParams(initDataString);
-  const hash = params.get('hash');
-  params.delete('hash');
-  params.delete('signature'); // 👈 Удаляем signature тоже, если вдруг есть
+// ✅ Проверка подписи Telegram (оставь, если нужна)
+// function verifyTelegram(initDataString, botToken) { ... }
 
-  const dataCheckArray = [];
-  for (const [key, value] of params.entries()) {
-    dataCheckArray.push(`${key}=${value}`);
-  }
-
-  dataCheckArray.sort(); // по алфавиту
-  const dataCheckString = dataCheckArray.join('\n');
-
-  const secretKey = crypto.createHash('sha256').update(botToken).digest();
-  const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-
-  // Добавь это на время отладки
-  console.log("🧪 Проверка подписи:");
-  console.log("dataCheckString:\n", dataCheckString);
-  console.log("hash из initData:", hash);
-  console.log("HMAC:", hmac);
-
-  return hmac === hash;
-}
-
-
+// Функция отправки сообщения пользователю Telegram
 async function sendTelegramMessage(user_id, message) {
   const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
@@ -66,8 +43,7 @@ async function sendTelegramMessage(user_id, message) {
   }
 }
 
-
-// 🔁 Обработка крутки колеса
+// Обработка POST /submit_spin
 app.post('/submit_spin', async (req, res) => {
   console.log("📩 Получен запрос /submit_spin");
   console.log("📩 Payload от клиента:", JSON.stringify(req.body, null, 2));
@@ -88,12 +64,9 @@ app.post('/submit_spin', async (req, res) => {
     return res.status(400).json({ error: "missing user or hash" });
   }
 
+  // Отключена проверка подписи, но можно включить:
   // const isValid = verifyTelegram(init_data, TELEGRAM_BOT_TOKEN);
-
-  // if (!isValid) {
-  //   console.error("❌ Подпись Telegram неверна");
-  //   return res.status(403).json({ error: "Invalid Telegram signature" });
-  // }
+  // if (!isValid) { ... }
 
   let user;
   try {
@@ -108,55 +81,61 @@ app.post('/submit_spin', async (req, res) => {
 
   console.log(`✅ Подтверждён пользователь: ${username} (${user_id})`);
 
-  // Firestore: запись/обновление
-  const spinsRef = db.collection("spins").doc(user_id);
-  const doc = await spinsRef.get();
-  const existing = doc.exists ? doc.data() : null;
+  try {
+    // Firestore: запись/обновление
+    const spinsRef = db.collection("spins").doc(user_id);
+    const doc = await spinsRef.get();
+    const existing = doc.exists ? doc.data() : null;
 
-  if (!existing) {
-    console.log("🆕 Новый пользователь. Создаём документ");
-    await spinsRef.set({
-      username: username,
-      spins: 1,
-      last_spin: Date.now()
+    if (!existing) {
+      console.log("🆕 Новый пользователь. Создаём документ");
+      await spinsRef.set({
+        username: username,
+        spins: 1,
+        last_spin: Date.now()
+      });
+    } else {
+      console.log("🔁 Увеличиваем счётчик круток");
+      await spinsRef.update({
+        spins: FieldValue.increment(1),
+        last_spin: Date.now()
+      });
+    }
+
+    const updated = (await spinsRef.get()).data();
+    console.log("📊 Текущие данные:", updated);
+
+    // Получаем приз
+    const prizeRef = db.collection("prizes").doc(String(result_index));
+    const prizeDoc = await prizeRef.get();
+
+    if (!prizeDoc.exists) {
+      console.warn(`❌ Приз с индексом ${result_index} не найден`);
+      return res.status(404).json({ error: "Prize not found" });
+    }
+
+    const prize = prizeDoc.data().text;
+
+    // Отправляем призовое сообщение пользователю в Telegram
+    await sendTelegramMessage(user_id, `🎉 Поздравляем! Ваш приз: ${prize}`);
+
+    // Отвечаем клиенту
+    res.json({
+      ok: true,
+      spins: updated.spins,
+      prize: prize
     });
-  } else {
-    console.log("🔁 Увеличиваем счётчик круток");
-    await spinsRef.update({
-      spins: FieldValue.increment(1),
-      last_spin: Date.now()
-    });
+
+  } catch (error) {
+    console.error("🔥 Ошибка в /submit_spin:", error);
+    res.status(500).json({ error: "internal server error" });
   }
-
-  const updated = (await spinsRef.get()).data();
-  console.log("📊 Текущие данные:", updated);
-
-  // 🎁 Получение приза
-  const prizeRef = admin.collection("prizes").doc(String(result_index));
-  const prizeDoc = await prizeRef.get();
-
-  if (!prizeDoc.exists) {
-    console.warn(`❌ Приз с индексом ${result_index} не найден`);
-    return res.status(404).json({ error: "Prize not found" });
-  }
-
-  const prize = prizeDoc.data().text;
-
-  res.json({
-    ok: true,
-    spins: updated.spins,
-    prize: prize
-  });
-
-
-  await sendTelegramMessage(user_id, prize);
-
 });
 
-// 🔍 Проверка подключения к Firestore
+// Проверка Firestore
 app.get('/test-firestore', async (req, res) => {
   try {
-    const test = await admin.collection("spins").limit(1).get();
+    const test = await db.collection("spins").limit(1).get();
     if (test.empty) {
       return res.json({ ok: true, message: "Firestore подключена, но коллекция пустая." });
     }
@@ -178,7 +157,7 @@ app.get('/', (req, res) => {
   res.send("🎯 Сервер Telegram Lucky Spin работает!");
 });
 
-// 🚀 Старт сервера
+// Запуск сервера
 app.listen(3000, () => {
   console.log("🚀 Сервер запущен на http://localhost:3000");
 });
