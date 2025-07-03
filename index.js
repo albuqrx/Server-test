@@ -1,11 +1,17 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const admin = require('./firebase');
+const cors = require('cors');
 require('dotenv').config();
+
+
+
 
 const crypto = require('crypto');
 const app = express();
+app.use(cors());
 app.use(bodyParser.json());
+
 
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN;
 
