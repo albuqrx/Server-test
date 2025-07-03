@@ -13,28 +13,31 @@ const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN;
 
 // ✅ Проверка подписи Telegram
 function verifyTelegram(initDataString, botToken) {
-  const parsed = new URLSearchParams(initDataString);
-  const hash = parsed.get('hash');
-  parsed.delete('hash');
+  const params = new URLSearchParams(initDataString);
+  const hash = params.get('hash');
+  params.delete('hash');
+  params.delete('signature'); // 👈 Удаляем signature тоже, если вдруг есть
 
   const dataCheckArray = [];
-  parsed.forEach((value, key) => {
+  for (const [key, value] of params.entries()) {
     dataCheckArray.push(`${key}=${value}`);
-  });
-  dataCheckArray.sort();
+  }
 
+  dataCheckArray.sort(); // по алфавиту
   const dataCheckString = dataCheckArray.join('\n');
-  const secret = crypto.createHash('sha256').update(botToken).digest();
-  const hmac = crypto.createHmac('sha256', secret).update(dataCheckString).digest('hex');
 
+  const secretKey = crypto.createHash('sha256').update(botToken).digest();
+  const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-  console.log("➡️  Проверка подписи Telegram:");
-  console.log("dataCheckString:", dataCheckString);
+  // Добавь это на время отладки
+  console.log("🧪 Проверка подписи:");
+  console.log("dataCheckString:\n", dataCheckString);
   console.log("hash из initData:", hash);
-  console.log("рассчитанный HMAC:", hmac);
+  console.log("HMAC:", hmac);
 
   return hmac === hash;
 }
+
 
 // 🔁 Обработка крутки колеса
 app.post('/submit_spin', async (req, res) => {
