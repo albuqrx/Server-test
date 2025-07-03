@@ -17,6 +17,7 @@ const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN;
 
 // ✅ Проверка подписи Telegram
 function verifyTelegram(initDataString, botToken) {
+  console.log("❌ Подпись Telegram неверна");
   const params = new URLSearchParams(initDataString);
   const hash = params.get('hash');
   params.delete('hash');
@@ -36,6 +37,7 @@ function verifyTelegram(initDataString, botToken) {
 
 // 🔁 Обработка крутки колеса
 app.post('/submit_spin', async (req, res) => {
+  console.log("📩 Получен запрос /submit_spin");
   console.log("📩 Получен запрос от клиента:", JSON.stringify(req.body, null, 2));
 
   const { init_data, result_index } = req.body;
